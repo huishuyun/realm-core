@@ -787,7 +787,7 @@ void Cluster::create(size_t nb_leaf_columns)
         auto col_ndx = col_key.get_index();
         auto type = col_key.get_type();
         auto attr = col_key.get_attrs();
-        if (attr.test(col_attr_List)) {
+        if (attr.test(col_attr_List) || attr.test(col_attr_Set)) {
             ArrayRef arr(m_alloc);
             arr.create();
             arr.set_parent(this, col_ndx.val + s_first_col_index);
@@ -965,7 +965,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             ++val;
         }
 
-        if (attr.test(col_attr_List)) {
+        if (attr.test(col_attr_List) || attr.test(col_attr_Set)) {
             REALM_ASSERT(init_value.is_null());
             ArrayRef arr(m_alloc);
             arr.set_parent(this, col_ndx.val + s_first_col_index);
@@ -1058,7 +1058,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
         auto attr = col_key.get_attrs();
         auto type = col_key.get_type();
 
-        if (attr.test(col_attr_List)) {
+        if (attr.test(col_attr_List) || attr.test(col_attr_Set)) {
             do_move<ArrayRef>(ndx, col_key, new_leaf);
             return false;
         }
@@ -1180,7 +1180,7 @@ inline void Cluster::do_insert_column(ColKey col_key, bool nullable)
 void Cluster::insert_column(ColKey col_key)
 {
     auto attr = col_key.get_attrs();
-    if (attr.test(col_attr_List)) {
+    if (attr.test(col_attr_List) || attr.test(col_attr_Set)) {
         size_t sz = node_size();
 
         ArrayRef arr(m_alloc);
@@ -1402,7 +1402,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
     auto erase_in_column = [&](ColKey col_key) {
         auto col_type = col_key.get_type();
         auto attr = col_key.get_attrs();
-        if (attr.test(col_attr_List)) {
+        if (attr.test(col_attr_List) || attr.test(col_attr_Set)) {
             auto col_ndx = col_key.get_index();
             ArrayRef values(m_alloc);
             values.set_parent(this, col_ndx.val + s_first_col_index);
@@ -1630,7 +1630,7 @@ void Cluster::verify() const
         auto col_type = col_key.get_type();
         bool nullable = attr.test(col_attr_Nullable);
 
-        if (attr.test(col_attr_List)) {
+        if (attr.test(col_attr_List) || attr.test(col_attr_Set)) {
             ArrayRef arr(get_alloc());
             arr.set_parent(const_cast<Cluster*>(this), col);
             arr.init_from_ref(ref);
@@ -1758,6 +1758,10 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
             size_t j = col.get_index().val + 1;
             if (col.get_attrs().test(col_attr_List)) {
                 std::cout << ", list";
+                continue;
+            }
+            if (col.get_attrs().test(col_attr_Set)) {
+                std::cout << ", set";
                 continue;
             }
 
