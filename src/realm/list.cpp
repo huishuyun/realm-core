@@ -99,7 +99,7 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 
 /********************************* LstBase **********************************/
 
-ConstLstBase::ConstLstBase(const Obj& owner, ColKey col_key)
+CollectionBase::CollectionBase(const Obj& owner, ColKey col_key)
     : m_obj(owner)
     , m_col_key(col_key)
 {
@@ -109,11 +109,9 @@ ConstLstBase::ConstLstBase(const Obj& owner, ColKey col_key)
     m_nullable = col_key.is_nullable();
 }
 
-ConstLstBase::~ConstLstBase()
-{
-}
+CollectionBase::~CollectionBase() {}
 
-ref_type ConstLstBase::get_child_ref(size_t) const noexcept
+ref_type CollectionBase::get_child_ref(size_t) const noexcept
 {
     try {
         return to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
@@ -123,17 +121,17 @@ ref_type ConstLstBase::get_child_ref(size_t) const noexcept
     }
 }
 
-void ConstLstBase::erase_repl(Replication* repl, size_t ndx) const
+void CollectionBase::erase_repl(Replication* repl, size_t ndx) const
 {
     repl->list_erase(*this, ndx);
 }
 
-void ConstLstBase::move_repl(Replication* repl, size_t from, size_t to) const
+void CollectionBase::move_repl(Replication* repl, size_t from, size_t to) const
 {
     repl->list_move(*this, from, to);
 }
 
-void ConstLstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
+void CollectionBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
 {
     if (ndx2 < ndx1)
         std::swap(ndx1, ndx2);
@@ -142,18 +140,18 @@ void ConstLstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
         repl->list_move(*this, ndx1 + 1, ndx2);
 }
 
-void ConstLstBase::clear_repl(Replication* repl) const
+void CollectionBase::clear_repl(Replication* repl) const
 {
     repl->list_clear(*this);
 }
 
 template <class T>
 Lst<T>::Lst(const Obj& obj, ColKey col_key)
-    : ConstLstBase(obj, col_key)
-    , ConstLstIf<T>(obj.get_alloc())
+    : CollectionBase(obj, col_key)
+    , Collection<T>(obj.get_alloc())
 {
     if (m_obj) {
-        ConstLstIf<T>::init_from_parent();
+        Collection<T>::init_from_parent();
     }
 }
 
@@ -187,7 +185,7 @@ struct MinHelper<T, void_t<ColumnMinMaxType<T>>> {
 };
 
 template <class T>
-Mixed ConstLstIf<T>::min(size_t* return_ndx) const
+Mixed Collection<T>::min(size_t* return_ndx) const
 {
     return MinHelper<T>::eval(*m_tree, return_ndx);
 }
@@ -211,7 +209,7 @@ struct MaxHelper<T, void_t<ColumnMinMaxType<T>>> {
 };
 
 template <class T>
-Mixed ConstLstIf<T>::max(size_t* return_ndx) const
+Mixed Collection<T>::max(size_t* return_ndx) const
 {
     return MaxHelper<T>::eval(*m_tree, return_ndx);
 }
@@ -239,7 +237,7 @@ public:
 };
 
 template <class T>
-Mixed ConstLstIf<T>::sum(size_t* return_cnt) const
+Mixed Collection<T>::sum(size_t* return_cnt) const
 {
     return SumHelper<T>::eval(*m_tree, return_cnt);
 }
@@ -265,13 +263,13 @@ struct AverageHelper<T, void_t<ColumnSumType<T>>> {
 };
 
 template <class T>
-Mixed ConstLstIf<T>::avg(size_t* return_cnt) const
+Mixed Collection<T>::avg(size_t* return_cnt) const
 {
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
-void ConstLstIf<T>::sort(std::vector<size_t>& indices, bool ascending) const
+void Collection<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
     auto sz = size();
     auto sz2 = indices.size();
@@ -297,7 +295,7 @@ void ConstLstIf<T>::sort(std::vector<size_t>& indices, bool ascending) const
 }
 
 template <class T>
-void ConstLstIf<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
+void Collection<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
 {
     indices.clear();
     sort(indices, sort_order ? *sort_order : true);
@@ -420,7 +418,7 @@ void Lst<ObjKey>::clear()
             while (ndx--) {
                 do_set(ndx, null_key);
                 m_tree->erase(ndx);
-                ConstLstBase::adj_remove(ndx);
+                CollectionBase::adj_remove(ndx);
             }
             // m_obj.bump_both_versions();
             m_obj.bump_content_version();
@@ -461,7 +459,7 @@ Obj LnkLst::get_object(size_t ndx) const
 
 bool LnkLst::init_from_parent() const
 {
-    ConstLstIf<ObjKey>::init_from_parent();
+    Collection<ObjKey>::init_from_parent();
     update_unresolved(m_unresolved, *m_tree);
 
     return m_valid;
@@ -562,7 +560,7 @@ void LnkLst::remove_all_target_rows()
 }
 
 LnkLst::LnkLst(const Obj& owner, ColKey col_key)
-    : ConstLstBase(owner, col_key)
+    : CollectionBase(owner, col_key)
     , Lst<ObjKey>(owner, col_key)
 {
     update_unresolved(m_unresolved, *m_tree);
